@@ -1,0 +1,1302 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vibe Coding 提示词生成器</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz@14..32&display=swap" rel="stylesheet" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'] },
+          colors: {
+            cosmos: '#07111f',
+            nebula: '#0b1728',
+            deep: '#080d19',
+            violet: '#7F77DD',
+            'violet-light': '#EEEDFE',
+            'violet-dark': '#3C3489',
+            'violet-hover': '#534AB7',
+          },
+          boxShadow: {
+            glass: '0 24px 70px rgba(4, 12, 24, 0.32)',
+            'glass-sm': '0 8px 32px rgba(4, 12, 24, 0.24)',
+          }
+        }
+      }
+    };
+  </script>
+  <script>
+    /* ---- 内联图标 SVG ---- */
+    const ICONS = {
+      sparkles: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c.5 3.5 2.5 5.5 6 6-3.5.5-5.5 2.5-6 6-.5-3.5-2.5-5.5-6-6 3.5-.5 5.5-2.5 6-6"/><path d="M5 16c.5 1.5 1.5 2.5 3 3-1.5.5-2.5 1.5-3 3-.5-1.5-1.5-2.5-3-3 1.5-.5 2.5-1.5 3-3"/><path d="M17 17c.5 1 1.5 1.5 2.5 2-1 .5-1.5 1.5-2 2.5-.5-1-1.5-1.5-2.5-2 1-.5 1.5-1.5 2-2.5"/></svg>',
+      wand: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 21L21 6"/><path d="M15 6l3-3 3 3-3 3"/><path d="M9 3L6 6 3 3"/><path d="M6 12L3 15l3 3"/><path d="M18 13l-3 3 3 3"/></svg>',
+      scale: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 20l10 0"/><path d="M6 6l6-1 6 1"/><path d="M12 3L12 20"/><path d="M9 12c-1.5 1-3 1-4.5 0"/><path d="M15 12c1.5 1 3 1 4.5 0"/></svg>',
+      components: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>',
+      info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>',
+      stack: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4L4 8l8 4 8-4-8-4z"/><path d="M4 12l8 4 8-4"/><path d="M4 16l8 4 8-4"/></svg>',
+      database: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3"/></svg>',
+      puzzle: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h3a1 1 0 001-1V5a2 2 0 014 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 000 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 00-4 0v1a1 1 0 01-1 1H4a1 1 0 01-1-1v-3a1 1 0 011-1h1a2 2 0 000-4H4a1 1 0 01-1-1V8a1 1 0 011-1"/></svg>',
+      file: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v4a1 1 0 001 1h4"/><path d="M17 21H7a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2z"/><path d="M9 12h6"/><path d="M9 16h4"/></svg>',
+      code: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>',
+      copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>',
+      claude: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>',
+      'arrow-right': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>',
+      check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+      plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>',
+      x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
+      bulb: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0018 8 6 6 0 006 8c0 1 .23 2.23 1.5 3.5.71.71 1.14 1.5 1.32 2.5"/></svg>',
+      'arrow-left': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>',
+      deepseek: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/><path d="M7 3l2 3-2 3"/><path d="M17 3l-2 3 2 3"/></svg>',
+      brain: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4a4 4 0 014 4c0 1.5-.5 2.5-1.5 3.5L12 14l-2.5-2.5C8.5 10.5 8 9.5 8 8a4 4 0 014-4z"/><path d="M12 14v6"/><path d="M9 18h6"/></svg>',
+      settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>',
+      eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>',
+    };
+    function icon(name, cls, size) {
+      const svg = ICONS[name] || ICONS.info;
+      return '<span class="inline-flex items-center justify-center align-middle ' + (cls || '') + '" style="width:' + (size || 20) + 'px;height:' + (size || 20) + 'px">' + svg + '</span>';
+    }
+  </script>
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    html, body {
+      width: 100%; min-height: 100vh;
+      background: #07111f;
+      font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+      overflow-x: hidden;
+    }
+
+    /* ---- 粒子画布 ---- */
+    #particleCanvas {
+      position: fixed; inset: 0; z-index: 0;
+      width: 100%; height: 100%; pointer-events: none;
+    }
+
+    /* ---- 背景光晕 ---- */
+    body::before {
+      content: ''; position: fixed; inset: 0; z-index: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 18% 12%, rgba(127, 119, 221, 0.10), transparent 32rem),
+        radial-gradient(circle at 82% 78%, rgba(155, 143, 237, 0.08), transparent 28rem),
+        radial-gradient(circle at 48% 52%, rgba(100, 120, 200, 0.04), transparent 40rem);
+    }
+
+    /* ---- 主容器 ---- */
+    .glass-card {
+      background: rgba(255, 255, 255, 0.04);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 0.5px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 24px 70px rgba(4, 12, 24, 0.32);
+    }
+
+    .glass-card-inner {
+      background: rgba(255, 255, 255, 0.03);
+      border: 0.5px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .glass-input {
+      background: rgba(255, 255, 255, 0.05);
+      border: 0.5px solid rgba(255, 255, 255, 0.10);
+      color: rgba(255, 255, 255, 0.85);
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .glass-input:focus {
+      border-color: rgba(127, 119, 221, 0.6);
+    }
+    .glass-input::placeholder {
+      color: rgba(255, 255, 255, 0.25);
+    }
+
+    .glass-select {
+      background: rgba(255, 255, 255, 0.05);
+      border: 0.5px solid rgba(255, 255, 255, 0.10);
+      color: rgba(255, 255, 255, 0.85);
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .glass-select:focus {
+      border-color: rgba(127, 119, 221, 0.6);
+    }
+    .glass-select option {
+      background: #0b1728; color: rgba(255,255,255,0.85);
+    }
+
+    /* ---- Chips ---- */
+    .chip {
+      font-size: 12px; padding: 4px 12px;
+      border-radius: 9999px;
+      border: 0.5px solid rgba(255, 255, 255, 0.12);
+      cursor: pointer; user-select: none;
+      color: rgba(255, 255, 255, 0.55);
+      background: transparent;
+      transition: all 0.15s ease;
+    }
+    .chip:hover {
+      border-color: rgba(127, 119, 221, 0.4);
+      color: rgba(255, 255, 255, 0.75);
+    }
+    .chip.on {
+      background: rgba(127, 119, 221, 0.18);
+      border-color: rgba(127, 119, 221, 0.5);
+      color: #c8c3ff;
+    }
+
+    /* ---- Tabs ---- */
+    .tab {
+      font-size: 13px; padding: 10px 20px;
+      cursor: pointer; user-select: none;
+      color: rgba(255, 255, 255, 0.45);
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+    .tab:hover { color: rgba(255, 255, 255, 0.7); }
+    .tab.active {
+      color: #c8c3ff;
+      border-bottom-color: #7F77DD;
+    }
+
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    /* ---- 输出框 ---- */
+    .output-box {
+      background: rgba(0, 0, 0, 0.35);
+      border: 0.5px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 1rem 1.1rem;
+      font-size: 12.5px;
+      font-family: 'SF Mono', 'Cascadia Mono', 'Consolas', monospace;
+      line-height: 1.8;
+      color: rgba(255, 255, 255, 0.82);
+      white-space: pre-wrap; word-break: break-word;
+      min-height: 120px;
+    }
+
+    /* ---- 对比框 ---- */
+    .bad-box {
+      background: rgba(200, 60, 60, 0.10);
+      border: 0.5px solid rgba(200, 60, 60, 0.25);
+      border-radius: 10px;
+      padding: 0.75rem 1rem;
+      font-size: 12.5px; font-family: 'SF Mono', 'Cascadia Mono', 'Consolas', monospace;
+      line-height: 1.8;
+      color: rgba(255, 180, 180, 0.85);
+      white-space: pre-wrap; margin-bottom: 0.5rem;
+    }
+    .good-box {
+      background: rgba(60, 180, 100, 0.08);
+      border: 0.5px solid rgba(60, 180, 100, 0.2);
+      border-radius: 10px;
+      padding: 0.75rem 1rem;
+      font-size: 12.5px; font-family: 'SF Mono', 'Cascadia Mono', 'Consolas', monospace;
+      line-height: 1.8;
+      color: rgba(160, 230, 180, 0.85);
+      white-space: pre-wrap; margin-bottom: 0.5rem;
+    }
+
+    .vs-bad  { background: rgba(200, 60, 60, 0.15); color: rgba(255, 160, 160, 0.9); padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; display: inline-block; margin-bottom: 4px; }
+    .vs-good { background: rgba(60, 180, 100, 0.15); color: rgba(160, 230, 180, 0.9); padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; display: inline-block; margin-bottom: 4px; }
+
+    .tip-card {
+      background: rgba(127, 119, 221, 0.06);
+      border-left: 3px solid rgba(127, 119, 221, 0.5);
+      border-radius: 0 10px 10px 0;
+      padding: 0.65rem 0.9rem;
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.6);
+      line-height: 1.7;
+    }
+
+    /* ---- 结构拆解步骤编号 ---- */
+    .step-num {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 500;
+      flex-shrink: 0;
+    }
+
+    /* ---- 动画 ---- */
+    .fade-in {
+      animation: fadeSlideIn 0.5s ease-out both;
+    }
+    @keyframes fadeSlideIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .enter-scale {
+      animation: enterScale 0.35s ease-out both;
+    }
+    @keyframes enterScale {
+      from { opacity: 0; transform: scale(0.96); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+
+    /* ---- 滚动条 ---- */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.15); }
+
+    /* ---- 加载动画 ---- */
+    .spinner {
+      border: 2px solid rgba(255,255,255,0.06);
+      border-top-color: #6EE7B7;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ---- 验证结果 ---- */
+    .ds-result-box {
+      background: rgba(0,0,0,0.25);
+      border: 0.5px solid rgba(255,255,255,0.06);
+      border-radius: 12px;
+      padding: 1rem 1.1rem;
+      font-size: 13px;
+      line-height: 1.8;
+      color: rgba(255,255,255,0.78);
+      white-space: pre-wrap; word-break: break-word;
+    }
+    .ds-result-box strong { color: rgba(255,255,255,0.9); }
+    .ds-result-box em { color: rgba(255,255,255,0.5); font-style: normal; font-size: 12px; }
+
+    /* ---- 数据模型行 ---- */
+    .model-row {
+      display: flex; gap: 8px; margin-bottom: 6px; align-items: center;
+    }
+    .del-btn {
+      background: transparent; border: none; cursor: pointer;
+      color: rgba(255,255,255,0.3); padding: 4px 7px;
+      border-radius: 6px; font-size: 15px; line-height: 1; flex-shrink: 0;
+      transition: all 0.12s;
+    }
+    .del-btn:hover {
+      background: rgba(200,60,60,0.15); color: rgba(255,120,120,0.8);
+    }
+    .add-btn {
+      background: transparent;
+      border: 0.5px dashed rgba(255,255,255,0.10);
+      border-radius: 8px; padding: 6px 14px; font-size: 13px;
+      cursor: pointer; color: rgba(255,255,255,0.4);
+      width: 100%; margin-top: 2px;
+      transition: all 0.12s;
+    }
+    .add-btn:hover {
+      border-color: rgba(127,119,221,0.4);
+      color: rgba(255,255,255,0.6);
+    }
+  </style>
+</head>
+<body class="antialiased">
+
+  <!-- 粒子背景 -->
+  <canvas id="particleCanvas" aria-hidden="true"></canvas>
+
+  <!-- 主容器 -->
+  <div class="relative z-10 flex min-h-screen items-start justify-center px-4 py-6 sm:px-6 sm:py-10">
+    <div class="glass-card w-full max-w-3xl rounded-3xl p-5 sm:p-8 fade-in">
+
+      <!-- 标题区 -->
+      <header class="mb-6 text-center sm:mb-8">
+        <div class="mb-2 flex items-center justify-center gap-2">
+          <i class="ti ti-sparkles text-violet" style="font-size:22px"></i>
+          <h1 class="text-xl font-semibold tracking-tight text-white/90 sm:text-2xl">Vibe Coding 提示词生成器</h1>
+        </div>
+        <p class="text-sm text-white/40">填好下面几项，生成结构化的项目提示词，直接发给 Claude 开干</p>
+      </header>
+
+      <!-- Tab 导航 -->
+      <nav class="mb-6 flex gap-0 border-b border-white/5 sm:mb-7" role="tablist">
+        <button class="tab active" data-tab="gen" role="tab" aria-selected="true">
+          <i class="ti ti-wand mr-1.5 inline-block align-middle" style="font-size:15px"></i>
+          提示词生成器
+        </button>
+        <button class="tab" data-tab="compare" role="tab" aria-selected="false">
+          <i class="ti ti-scale mr-1.5 inline-block align-middle" style="font-size:15px"></i>
+          好坏对比
+        </button>
+        <button class="tab" data-tab="struct" role="tab" aria-selected="false">
+          <i class="ti ti-components mr-1.5 inline-block align-middle" style="font-size:15px"></i>
+          结构拆解
+        </button>
+      </nav>
+
+      <!-- ============================================================ -->
+      <!-- TAB 1: 生成器 -->
+      <!-- ============================================================ -->
+      <section id="panel-gen" class="panel active" role="tabpanel">
+
+        <!-- 项目基本信息 -->
+        <div class="mb-2 flex items-center gap-2">
+          <i class="ti ti-info-circle text-violet" style="font-size:16px"></i>
+          <span class="text-[11px] font-medium uppercase tracking-[0.06em] text-white/40">项目基本信息</span>
+        </div>
+        <div class="glass-card-inner mb-6 rounded-2xl p-4 sm:p-5">
+          <div class="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label class="mb-1.5 block text-[13px] text-white/50">项目名称</label>
+              <input type="text" id="pName" class="glass-input w-full rounded-xl px-3 py-2 text-sm" placeholder="如：TaskFlow" />
+            </div>
+            <div>
+              <label class="mb-1.5 block text-[13px] text-white/50">项目类型</label>
+              <select id="pType" class="glass-select w-full rounded-xl px-3 py-2 text-sm">
+                <option>SaaS 工具</option>
+                <option>电商平台</option>
+                <option>内容管理系统</option>
+                <option>任务管理工具</option>
+                <option>社区论坛</option>
+                <option>预约系统</option>
+                <option>数据看板</option>
+                <option>AI 应用</option>
+                <option>小程序</option>
+              </select>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="mb-1.5 block text-[13px] text-white/50">一句话描述（是什么 · 给谁用 · 解决什么问题）</label>
+            <input type="text" id="pDesc" class="glass-input w-full rounded-xl px-3 py-2 text-sm" placeholder="如：给自由职业者用的时间追踪和发票管理工具" />
+          </div>
+          <div>
+            <label class="mb-1.5 block text-[13px] text-white/50">核心功能（用逗号分隔）</label>
+            <input type="text" id="pFeatures" class="glass-input w-full rounded-xl px-3 py-2 text-sm" placeholder="如：用户注册登录，项目管理，时间记录，生成报告" />
+          </div>
+        </div>
+
+        <!-- 技术栈 -->
+        <div class="mb-2 flex items-center gap-2">
+          <i class="ti ti-stack-2 text-violet" style="font-size:16px"></i>
+          <span class="text-[11px] font-medium uppercase tracking-[0.06em] text-white/40">技术栈选择</span>
+        </div>
+        <div class="glass-card-inner mb-6 rounded-2xl p-4 sm:p-5">
+          <div class="mb-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label class="mb-1.5 block text-[13px] text-white/50">前端框架</label>
+              <div class="chip-row flex flex-wrap gap-1.5" id="cFe">
+                <span class="chip on" data-group="fe">Next.js 14</span>
+                <span class="chip" data-group="fe">Nuxt 3</span>
+                <span class="chip" data-group="fe">Vue 3 + Vite</span>
+                <span class="chip" data-group="fe">Remix</span>
+                <span class="chip" data-group="fe">React + Vite</span>
+                <span class="chip" data-group="fe">SvelteKit</span>
+                <span class="chip" data-group="fe">纯 HTML</span>
+              </div>
+            </div>
+            <div>
+              <label class="mb-1.5 block text-[13px] text-white/50">样式方案</label>
+              <div class="chip-row flex flex-wrap gap-1.5" id="cCss">
+                <span class="chip on" data-group="css">Tailwind CSS</span>
+                <span class="chip" data-group="css">shadcn/ui</span>
+                <span class="chip" data-group="css">Ant Design</span>
+                <span class="chip" data-group="css">Element Plus</span>
+                <span class="chip" data-group="css">Naive UI</span>
+                <span class="chip" data-group="css">Vant（移动端）</span>
+                <span class="chip" data-group="css">NutUI（移动端）</span>
+                <span class="chip" data-group="css">Ant Design Mobile</span>
+              </div>
+            </div>
+          </div>
+          <div class="mb-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label class="mb-1.5 block text-[13px] text-white/50">后端方案</label>
+              <div class="chip-row flex flex-wrap gap-1.5" id="cBe">
+                <span class="chip on" data-group="be">Next.js API Routes</span>
+                <span class="chip" data-group="be">Python + FastAPI</span>
+                <span class="chip" data-group="be">Go + Gin</span>
+                <span class="chip" data-group="be">Go + Echo</span>
+                <span class="chip" data-group="be">Java + Spring Boot</span>
+                <span class="chip" data-group="be">Node + Hono</span>
+                <span class="chip" data-group="be">Node + Fastify</span>
+                <span class="chip" data-group="be">Rust + Axum</span>
+                <span class="chip" data-group="be">暂不需要</span>
+              </div>
+            </div>
+            <div>
+              <label class="mb-1.5 block text-[13px] text-white/50">数据库</label>
+              <div class="chip-row flex flex-wrap gap-1.5" id="cDb">  
+                <span class="chip on" data-group="db">MySQL</span>
+                <span class="chip" data-group="db">PostgreSQL</span>
+                <span class="chip" data-group="db">SQLite</span>
+                <span class="chip" data-group="db">MongoDB</span>
+                <span class="chip" data-group="db">暂不需要</span>
+              </div>
+              <label class="mb-1.5 mt-2.5 block text-[13px] text-white/50">ORM</label>
+              <div class="chip-row flex flex-wrap gap-1.5" id="cOrm">
+                <span class="chip on" data-group="orm">Prisma</span>
+                <span class="chip" data-group="orm">Drizzle</span>
+                <span class="chip" data-group="orm">SQLAlchemy</span>
+                <span class="chip" data-group="orm">Django ORM</span>
+                <span class="chip" data-group="orm">GORM</span>
+                <span class="chip" data-group="orm">不需要</span>
+              </div>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label class="mb-1.5 block text-[13px] text-white/50">认证方案</label>
+              <div class="chip-row flex flex-wrap gap-1.5" id="cAuth">
+                <span class="chip on" data-group="auth">Clerk</span>
+                <span class="chip" data-group="auth">NextAuth.js</span>
+                <span class="chip" data-group="auth">自己实现 JWT</span>
+                <span class="chip" data-group="auth">暂不需要</span>
+              </div>
+            </div>
+            <div>
+              <label class="mb-1.5 block text-[13px] text-white/50">部署目标</label>
+              <div class="chip-row flex flex-wrap gap-1.5" id="cDeploy">
+                <span class="chip on" data-group="deploy">Vercel</span>
+                <span class="chip" data-group="deploy">Railway</span>
+                <span class="chip" data-group="deploy">Docker</span>
+                <span class="chip" data-group="deploy">暂不考虑</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 数据模型 -->
+        <div class="mb-2 flex items-center gap-2">
+          <i class="ti ti-database text-violet" style="font-size:16px"></i>
+          <span class="text-[11px] font-medium uppercase tracking-[0.06em] text-white/40">数据模型</span>
+        </div>
+        <div class="glass-card-inner mb-6 rounded-2xl p-4 sm:p-5">
+          <label class="mb-2 block text-[13px] text-white/50">按行填写核心实体（可添加多行）</label>
+          <div id="modelList"></div>
+          <button class="add-btn" onclick="addModel()">
+            <i class="ti ti-plus mr-1 align-middle" style="font-size:15px"></i> 添加实体
+          </button>
+        </div>
+
+        <!-- 额外需求 -->
+        <div class="mb-2 flex items-center gap-2">
+          <i class="ti ti-puzzle text-violet" style="font-size:16px"></i>
+          <span class="text-[11px] font-medium uppercase tracking-[0.06em] text-white/40">额外需求（可选）</span>
+        </div>
+        <div class="glass-card-inner mb-6 rounded-2xl p-4 sm:p-5">
+          <label class="mb-1.5 block text-[13px] text-white/50">第三方集成</label>
+          <div class="chip-row mb-3 flex flex-wrap gap-1.5" id="cExtra">
+            <span class="chip" data-group="extra">Stripe 支付</span>
+            <span class="chip" data-group="extra">文件上传</span>
+            <span class="chip" data-group="extra">邮件发送</span>
+            <span class="chip" data-group="extra">OpenAI 接口</span>
+            <span class="chip" data-group="extra">实时推送</span>
+            <span class="chip" data-group="extra">多角色权限</span>
+            <span class="chip" data-group="extra">多语言</span>
+            <span class="chip" data-group="extra">数据导出</span>
+          </div>
+          <div>
+            <label class="mb-1.5 block text-[13px] text-white/50">其他补充</label>
+            <input type="text" id="pExtra" class="glass-input w-full rounded-xl px-3 py-2 text-sm" placeholder="如：需要管理员后台、分页用 cursor 而非 offset" />
+          </div>
+        </div>
+
+        <!-- 生成范围 -->
+        <div class="mb-2 flex items-center gap-2">
+          <i class="ti ti-file-text text-violet" style="font-size:16px"></i>
+          <span class="text-[11px] font-medium uppercase tracking-[0.06em] text-white/40">本次生成范围</span>
+        </div>
+        <div class="glass-card-inner mb-6 rounded-2xl p-4 sm:p-5">
+          <div class="chip-row flex flex-wrap gap-1.5" id="cScope">
+            <span class="chip on" data-group="scope">Schema 文件</span>
+            <span class="chip on" data-group="scope">数据库客户端</span>
+            <span class="chip on" data-group="scope">CRUD API</span>
+            <span class="chip on" data-group="scope">类型定义</span>
+            <span class="chip on" data-group="scope">.env.example</span>
+            <span class="chip on" data-group="scope">.gitignore</span>
+            <span class="chip on" data-group="scope">README.md</span>
+            <span class="chip on" data-group="scope">前端页面</span>
+            <span class="chip" data-group="scope">认证集成</span>
+            <span class="chip" data-group="scope">Swagger / OpenAPI</span>
+          </div>
+        </div>
+
+        <!-- 生成按钮 -->
+        <button onclick="generate()" class="group w-full rounded-2xl bg-violet/80 px-5 py-3 text-sm font-medium text-white transition hover:bg-violet-hover hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-violet/30">
+          <i class="ti ti-wand mr-2 align-middle" style="font-size:16px"></i>
+          生成提示词
+          <i class="ti ti-arrow-right ml-1 align-middle transition group-hover:translate-x-0.5" style="font-size:16px"></i>
+        </button>
+
+        <!-- 输出区域 -->
+        <div id="outputWrap" class="mt-6" style="display:none">
+          <div class="mb-3 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <i class="ti ti-code text-violet" style="font-size:16px"></i>
+              <span class="text-[11px] font-medium uppercase tracking-[0.06em] text-white/40">生成的提示词</span>
+              <span id="wordCount" class="ml-1 text-[11px] text-white/25"></span>
+            </div>
+            <div class="flex gap-2">
+              <button onclick="copyPrompt()" class="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-[12px] text-white/50 transition hover:bg-white/10 hover:text-white/70">
+                <i class="ti ti-copy mr-1 align-middle" style="font-size:14px"></i>复制
+              </button>
+              <button onclick="sendPrompt()" class="rounded-xl bg-violet/70 px-3 py-1.5 text-[12px] text-white transition hover:bg-violet-hover">
+                <i class="ti ti-brand-claude mr-1 align-middle" style="font-size:14px"></i>发给 Claude
+              </button>
+            </div>
+          </div>
+          <div class="output-box" id="outputBox"></div>
+
+          <!-- DeepSeek 验证 -->
+          <div class="mt-5 rounded-2xl border border-white/5 bg-white/[0.02] p-4 sm:p-5">
+            <div class="mb-3 flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <i class="ti ti-deepseek text-emerald-400" style="font-size:18px"></i>
+                <span class="text-[11px] font-medium uppercase tracking-[0.06em] text-white/40">DeepSeek 验证</span>
+              </div>
+              <button onclick="toggleDsSettings()" class="rounded-lg border border-white/5 bg-white/5 px-2.5 py-1 text-[11px] text-white/40 transition hover:bg-white/10 hover:text-white/60">
+                <i class="ti ti-settings mr-1 align-middle" style="font-size:12px"></i>设置
+              </button>
+            </div>
+
+            <!-- 设置区（可折叠） -->
+            <div id="dsSettings" class="mb-3 space-y-3" style="display:none">
+              <div>
+                <label class="mb-1 block text-[12px] text-white/40">DeepSeek API Key</label>
+                <div class="flex gap-2">
+                  <input type="password" id="dsApiKey" class="glass-input w-full rounded-xl px-3 py-2 text-sm" placeholder="sk-..." autocomplete="off" />
+                  <button onclick="toggleDsKey()" class="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 text-[12px] text-white/40 hover:bg-white/10" title="显示/隐藏">
+                    <i class="ti ti-eye" style="font-size:15px"></i>
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label class="mb-1 block text-[12px] text-white/40">系统提示词（可自定义）</label>
+                <textarea id="dsSystemPrompt" rows="4" class="glass-input w-full rounded-xl px-3 py-2 text-sm leading-relaxed" placeholder="自定义 DeepSeek 审核提示词...">你是一个资深的 AI 提示词审核专家。请严格检查以下用于 AI 编程的提示词，指出：
+
+1. **逻辑问题**：是否存在矛盾、遗漏或顺序不合理的地方
+2. **不严谨之处**：技术栈冲突、命名不一致、细节缺失
+3. **模糊描述**：哪些地方 AI 容易理解偏差或需要补充
+4. **优化建议**：具体如何改进
+
+请用中文回复，按类别分条列出，语气直接、专业。</textarea>
+              </div>
+            </div>
+
+            <!-- 验证按钮 -->
+            <button id="dsValidateBtn" onclick="validatePrompt()" class="w-full rounded-xl bg-emerald-700/60 px-4 py-2.5 text-sm font-medium text-white/90 transition hover:bg-emerald-600/70 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 disabled:pointer-events-none disabled:opacity-40">
+              <i class="ti ti-brain mr-2 align-middle" style="font-size:16px"></i>
+              验证提示词
+            </button>
+
+            <!-- 加载状态 -->
+            <div id="dsLoading" class="mt-3 hidden">
+              <div class="flex items-center gap-3 rounded-xl border border-emerald-500/10 bg-emerald-500/5 px-4 py-3">
+                <div class="spinner h-5 w-5 shrink-0"></div>
+                <span class="text-sm text-white/60">DeepSeek 正在分析提示词...</span>
+              </div>
+            </div>
+
+            <!-- 验证结果 -->
+            <div id="dsResult" class="mt-3 hidden"></div>
+
+            <!-- 用户反馈 + 优化生成 -->
+            <div id="dsFeedback" class="mt-3 hidden">
+              <div class="mb-2 flex items-center gap-2">
+                <span class="text-[12px] text-white/50">根据 DeepSeek 的建议，输入你的确认或修改意见</span>
+              </div>
+              <textarea id="dsUserFeedback" rows="3" class="glass-input w-full rounded-xl px-3 py-2 text-sm leading-relaxed mb-3" placeholder="如：同意以上建议，帮我优化生成新版提示词&#10;或：把数据库改为 PostgreSQL，功能列表增加搜索..."></textarea>
+              <button id="dsOptimizeBtn" onclick="regenerateOptimized()" class="w-full rounded-xl bg-violet/70 px-4 py-2.5 text-sm font-medium text-white/90 transition hover:bg-violet-hover hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-violet/30 disabled:pointer-events-none disabled:opacity-40">
+                <i class="ti ti-wand mr-2 align-middle" style="font-size:16px"></i>
+                优化生成新版提示词
+              </button>
+              <!-- 优化加载 -->
+              <div id="dsOptimizeLoading" class="mt-3 hidden">
+                <div class="flex items-center gap-3 rounded-xl border border-violet/10 bg-violet/5 px-4 py-3">
+                  <div class="spinner h-5 w-5 shrink-0" style="border-top-color:#7F77DD"></div>
+                  <span class="text-sm text-white/60">DeepSeek 正在优化提示词...</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- TAB 2: 好坏对比 -->
+      <!-- ============================================================ -->
+      <section id="panel-compare" class="panel" role="tabpanel">
+        <h2 class="mb-5 text-base font-medium text-white/80">同一个需求，两种写法的差距</h2>
+
+        <!-- 场景 1 -->
+        <div class="mb-2 text-[11px] font-medium uppercase tracking-[0.06em] text-white/40">场景 1 — 任务管理工具</div>
+        <span class="vs-bad"><i class="ti ti-x mr-1 align-middle" style="font-size:13px"></i>太模糊</span>
+        <div class="bad-box">帮我做一个任务管理 App，有前端后端和数据库。</div>
+        <span class="vs-good"><i class="ti ti-check mr-1 align-middle" style="font-size:13px"></i>清晰有效</span>
+        <div class="good-box mb-4">我要搭一个任务管理 App 的初始项目骨架，技术栈如下：
+
+前端：Next.js 14 App Router + Tailwind CSS + shadcn/ui
+后端：Next.js API Routes（放在 /app/api/ 下）
+数据库：PostgreSQL，用 Prisma ORM
+认证：Clerk（已有账号，先留 placeholder）
+部署目标：Vercel + Supabase
+
+数据模型：
+- User：id, email, name, createdAt
+- Project：id, userId(FK), title, color, createdAt
+- Task：id, projectId(FK), title, description, status(enum: TODO/IN_PROGRESS/DONE), dueDate, createdAt
+
+需要帮我生成：
+1. 完整的 prisma/schema.prisma 文件
+2. lib/db.ts（Prisma 客户端单例）
+3. /app/api/tasks/route.ts（GET 列表、POST 创建）
+4. /app/api/tasks/[id]/route.ts（PATCH 更新状态、DELETE 删除）
+5. 一个 TaskCard 组件（components/features/TaskCard.tsx）
+6. .env.example 文件
+
+文件夹结构要清晰，代码用 TypeScript，加上必要的类型定义，关键地方加注释。</div>
+
+        <div class="tip-card mb-5">
+          <i class="ti ti-bulb mr-1.5 align-middle text-violet" style="font-size:15px"></i>
+          规律：给 AI 写提示词就像写需求文档。技术栈、数据结构、要输出哪些文件 — 三件事说清楚，AI 就能一次给出可用的骨架。
+        </div>
+
+        <!-- 场景 2 -->
+        <div class="mb-2 text-[11px] font-medium uppercase tracking-[0.06em] text-white/40">场景 2 — 电商平台</div>
+        <span class="vs-bad"><i class="ti ti-x mr-1 align-middle" style="font-size:13px"></i>太模糊</span>
+        <div class="bad-box">帮我做一个电商网站，卖衣服的，要有购物车和支付。</div>
+        <span class="vs-good"><i class="ti ti-check mr-1 align-middle" style="font-size:13px"></i>清晰有效</span>
+        <div class="good-box">搭一个服装电商平台的 Next.js 初始项目，技术栈：
+
+前端：Next.js 14 + Tailwind CSS + shadcn/ui
+后端：Next.js API Routes
+数据库：PostgreSQL + Prisma
+认证：NextAuth.js（支持 Google OAuth）
+支付：Stripe（先只需要接口占位，不需要完整实现）
+
+核心数据模型：
+- User：id, email, name, role(enum: ADMIN/CUSTOMER)
+- Product：id, name, description, price, stock, images(String[]), category
+- Order：id, userId(FK), status(enum: PENDING/PAID/SHIPPED/DONE), total
+- OrderItem：id, orderId(FK), productId(FK), quantity, price
+- Cart：id, userId(FK)，CartItem：cartId, productId, quantity
+
+本次只需要生成：
+1. prisma/schema.prisma（含上面所有模型）
+2. 商品列表 API：GET /api/products（支持分页 ?page=1&limit=20、分类过滤 ?category=xx）
+3. 购物车 API：GET/POST/DELETE /api/cart
+4. lib/db.ts 和 lib/stripe.ts（Stripe 客户端占位）
+5. .env.example
+
+不需要生成 UI 页面，先把后端打通。</div>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- TAB 3: 结构拆解 -->
+      <!-- ============================================================ -->
+      <section id="panel-struct" class="panel" role="tabpanel">
+        <h2 class="mb-2 text-base font-medium text-white/80">一个好提示词的 7 个组成部分</h2>
+        <div class="tip-card mb-5">
+          <i class="ti ti-bulb mr-1.5 align-middle text-violet" style="font-size:15px"></i>
+          按这个顺序写，AI 就能准确理解你要什么。缺哪块，AI 就会自己"脑补"，脑补的往往不是你想要的。
+        </div>
+
+        <!-- 步骤 1 -->
+        <div class="glass-card-inner mb-3 rounded-2xl p-4 sm:p-5">
+          <div class="flex gap-3">
+            <div class="step-num" style="background:rgba(127,119,221,0.2);color:#c8c3ff">1</div>
+            <div>
+              <div class="mb-1 text-sm font-medium text-white/80">任务目标 — 我要做什么</div>
+              <div class="mb-2 text-[13px] leading-6 text-white/50">开头一句话说清楚这次要做什么。是"搭初始骨架"、"写某个功能"、还是"改已有代码"。</div>
+              <div class="output-box" style="min-height:auto;padding:0.6rem 0.8rem">✅ 我要搭一个 XX 项目的初始骨架，只需要基础结构跑通，不需要完整功能</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 步骤 2 -->
+        <div class="glass-card-inner mb-3 rounded-2xl p-4 sm:p-5">
+          <div class="flex gap-3">
+            <div class="step-num" style="background:rgba(60,180,100,0.2);color:rgba(160,230,180,0.9)">2</div>
+            <div>
+              <div class="mb-1 text-sm font-medium text-white/80">技术栈 — 用什么工具</div>
+              <div class="mb-2 text-[13px] leading-6 text-white/50">前端框架、样式库、后端、数据库、ORM、认证、部署 — 每一项都点名。不说就让 AI 猜，猜错了要返工。</div>
+              <div class="output-box" style="min-height:auto;padding:0.6rem 0.8rem">前端：Next.js 14 App Router + Tailwind + shadcn/ui<br/>后端：Next.js API Routes<br/>数据库：PostgreSQL + Prisma ORM<br/>认证：Clerk<br/>部署：Vercel</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 步骤 3 -->
+        <div class="glass-card-inner mb-3 rounded-2xl p-4 sm:p-5">
+          <div class="flex gap-3">
+            <div class="step-num" style="background:rgba(230,180,60,0.2);color:rgba(230,200,100,0.9)">3</div>
+            <div>
+              <div class="mb-1 text-sm font-medium text-white/80">数据模型 — 核心表结构</div>
+              <div class="mb-2 text-[13px] leading-6 text-white/50">列出主要的表和字段，说明表之间的关系（谁是谁的外键）。这是 AI 生成代码的基础，越准确越好。</div>
+              <div class="output-box" style="min-height:auto;padding:0.6rem 0.8rem">User：id, email, name, role<br/>Post：id, userId(FK→User), title, content, published<br/>Comment：id, postId(FK→Post), userId(FK→User), body</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 步骤 4 -->
+        <div class="glass-card-inner mb-3 rounded-2xl p-4 sm:p-5">
+          <div class="flex gap-3">
+            <div class="step-num" style="background:rgba(200,120,80,0.2);color:rgba(230,170,130,0.9)">4</div>
+            <div>
+              <div class="mb-1 text-sm font-medium text-white/80">输出清单 — 要哪些文件</div>
+              <div class="mb-2 text-[13px] leading-6 text-white/50">明确告诉 AI 要生成哪些文件，用编号列出来。这样 AI 不会遗漏，也不会生成多余的东西。</div>
+              <div class="output-box" style="min-height:auto;padding:0.6rem 0.8rem">请生成以下文件：<br/>1. prisma/schema.prisma<br/>2. lib/db.ts（Prisma 单例）<br/>3. app/api/posts/route.ts（GET + POST）<br/>4. .env.example</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 步骤 5 -->
+        <div class="glass-card-inner mb-3 rounded-2xl p-4 sm:p-5">
+          <div class="flex gap-3">
+            <div class="step-num" style="background:rgba(60,180,100,0.2);color:rgba(160,230,180,0.9)">5</div>
+            <div>
+              <div class="mb-1 text-sm font-medium text-white/80">边界 — 不要什么</div>
+              <div class="mb-2 text-[13px] leading-6 text-white/50">告诉 AI 本次不做什么，避免它生成一大堆你不需要的代码，反而干扰重点。</div>
+              <div class="output-box" style="min-height:auto;padding:0.6rem 0.8rem">本次不需要：<br/>- UI 页面（只要后端 API）<br/>- 完整的邮件发送功能（留 placeholder 即可）<br/>- 测试文件</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 步骤 6 -->
+        <div class="glass-card-inner mb-3 rounded-2xl p-4 sm:p-5">
+          <div class="flex gap-3">
+            <div class="step-num" style="background:rgba(127,119,221,0.2);color:#c8c3ff">6</div>
+            <div>
+              <div class="mb-1 text-sm font-medium text-white/80">代码规范 — 怎么写</div>
+              <div class="mb-2 text-[13px] leading-6 text-white/50">说明用 TypeScript、要加注释、错误处理方式、命名风格等。一次说好，后面迭代风格统一。</div>
+              <div class="output-box" style="min-height:auto;padding:0.6rem 0.8rem">代码要求：<br/>- 全部用 TypeScript，严格类型<br/>- API 返回统一格式：{data, error}<br/>- 数据库操作加 try/catch<br/>- 关键逻辑加中文注释</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 步骤 7 -->
+        <div class="glass-card-inner mb-4 rounded-2xl p-4 sm:p-5">
+          <div class="flex gap-3">
+            <div class="step-num" style="background:rgba(180,180,180,0.2);color:rgba(220,220,220,0.9)">7</div>
+            <div>
+              <div class="mb-1 text-sm font-medium text-white/80">最后要求 — 怎么给我</div>
+              <div class="mb-2 text-[13px] leading-6 text-white/50">要求 AI 按文件分开输出（不要一坨混在一起），并说明下一步怎么跑起来。</div>
+              <div class="output-box" style="min-height:auto;padding:0.6rem 0.8rem">请按文件分开输出，每个文件前标明文件路径。<br/>最后给出运行步骤（npm install、prisma migrate、npm run dev）。</div>
+            </div>
+          </div>
+        </div>
+
+        <button onclick="switchTab('gen')" class="w-full rounded-2xl border border-white/10 bg-white/5 px-5 py-2.5 text-sm text-white/60 transition hover:bg-white/10 hover:text-white/80">
+          <i class="ti ti-arrow-left mr-2 align-middle" style="font-size:15px"></i>去生成器填写
+        </button>
+      </section>
+
+      <!-- Footer -->
+      <footer class="mt-6 border-t border-white/5 pt-4 text-center text-[12px] text-white/20">
+        <span>Vibe Coding 提示词生成器 · 让每个项目从好提示词开始</span>
+      </footer>
+    </div>
+  </div>
+
+  <script>
+    // ================================================================
+    // 粒子背景
+    // ================================================================
+    (function initParticles() {
+      const canvas = document.getElementById('particleCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      let w = 0, h = 0, dpr = 1, animId = 0, particles = [], lastTime = performance.now();
+      const mouse = { x: 0, y: 0, active: false };
+
+      function rand(min, max) { return min + Math.random() * (max - min); }
+
+      function resize() {
+        w = window.innerWidth; h = window.innerHeight;
+        dpr = Math.min(window.devicePixelRatio || 1, 2);
+        canvas.width = Math.floor(w * dpr); canvas.height = Math.floor(h * dpr);
+        canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        const n = Math.min(80, Math.max(32, Math.floor((w * h) / 16000)));
+        particles = Array.from({ length: n }, () => ({
+          x: Math.random() * w, y: Math.random() * h,
+          r: rand(0.5, 2.0), vx: rand(-0.08, 0.08), vy: rand(-0.18, -0.04),
+          a: rand(0.10, 0.40), phase: Math.random() * Math.PI * 2,
+          twinkleSpeed: rand(0.001, 0.004),
+          hue: rand(-8, 20)
+        }));
+      }
+
+      function draw(time) {
+        const dt = Math.min((time - lastTime) / 16.67, 2);
+        lastTime = time;
+        ctx.clearRect(0, 0, w, h);
+
+        for (const p of particles) {
+          p.x += p.vx * dt; p.y += p.vy * dt;
+          if (p.y < -8) { p.y = h + 8; p.x = Math.random() * w; }
+          if (p.x < -8) p.x = w + 8;
+          if (p.x > w + 8) p.x = -8;
+
+          if (mouse.active) {
+            const dx = p.x - mouse.x, dy = p.y - mouse.y;
+            const dist = Math.hypot(dx, dy);
+            if (dist > 0 && dist < 160) {
+              const f = (1 - dist / 160) * 0.4 * dt;
+              p.x += (dx / dist) * f; p.y += (dy / dist) * f;
+            }
+          }
+
+          const twinkle = Math.sin(time * p.twinkleSpeed + p.phase) * 0.22;
+          const alpha = Math.max(0.08, Math.min(0.8, p.a + twinkle));
+          const glow = p.r * 4;
+
+          ctx.beginPath();
+          ctx.fillStyle = 'hsla(' + (218 + p.hue) + ', 80%, 82%, ' + (alpha * 0.8) + ')';
+          ctx.shadowColor = 'hsla(' + (200 + p.hue) + ', 90%, 72%, ' + alpha + ')';
+          ctx.shadowBlur = glow;
+          ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.shadowBlur = 0;
+        }
+        animId = requestAnimationFrame(draw);
+      }
+
+      function start() { cancelAnimationFrame(animId); lastTime = performance.now(); animId = requestAnimationFrame(draw); }
+      function stop() { cancelAnimationFrame(animId); }
+
+      window.addEventListener('resize', resize);
+      window.addEventListener('pointermove', e => { mouse.x = e.clientX; mouse.y = e.clientY; mouse.active = true; });
+      window.addEventListener('pointerleave', () => { mouse.active = false; });
+      window.addEventListener('blur', () => { mouse.active = false; });
+      document.addEventListener('visibilitychange', () => { document.hidden ? stop() : start(); });
+      resize();
+      start();
+    })();
+
+    // ================================================================
+    // Tab 切换
+    // ================================================================
+    function switchTab(id) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      const tabs = document.querySelectorAll('.tab');
+      const panels = { gen: 0, compare: 1, struct: 2 };
+      tabs[panels[id]].classList.add('active');
+      document.getElementById('panel-' + id).classList.add('active');
+    }
+
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+    });
+
+    // ================================================================
+    // Chip 切换
+    // ================================================================
+    // 单选组
+    const soloGroups = ['fe', 'css', 'be', 'db', 'orm', 'auth', 'deploy'];
+    // 多选组
+    const multiGroups = ['extra', 'scope'];
+
+    document.querySelectorAll('.chip').forEach(chip => {
+      chip.addEventListener('click', function() {
+        const group = this.dataset.group;
+        if (!group) return;
+        if (soloGroups.includes(group)) {
+          document.querySelectorAll('#c' + group.charAt(0).toUpperCase() + group.slice(1) + ' .chip').forEach(c => c.classList.remove('on'));
+          this.classList.add('on');
+        } else {
+          this.classList.toggle('on');
+        }
+      });
+    });
+
+    // ================================================================
+    // 数据模型行
+    // ================================================================
+    let modelCount = 0;
+
+    function addModel(name, fields) {
+      const i = modelCount++;
+      const div = document.createElement('div');
+      div.className = 'model-row';
+      div.id = 'mr' + i;
+      div.innerHTML =
+        '<input type="text" class="glass-input w-[110px] shrink-0 rounded-lg px-2.5 py-1.5 text-sm" placeholder="实体名" id="mn' + i + '" value="' + (name || '') + '" />' +
+        '<input type="text" class="glass-input flex-1 rounded-lg px-2.5 py-1.5 text-sm" placeholder="字段：id, title, userId(FK→User), status(enum), createdAt" id="mf' + i + '" value="' + (fields || '') + '" />' +
+        '<button class="del-btn" onclick="document.getElementById(\'mr' + i + '\').remove()" aria-label="删除">' + icon('x', '', 16) + '</button>';
+      document.getElementById('modelList').appendChild(div);
+    }
+
+    // 初始行
+    addModel('User', 'id, email, name, createdAt, updatedAt');
+    addModel('', '');
+
+    function getModels() {
+      const r = [];
+      document.querySelectorAll('.model-row').forEach(row => {
+        const idx = row.id.replace('mr', '');
+        const n = (document.getElementById('mn' + idx) || {}).value || '';
+        const f = (document.getElementById('mf' + idx) || {}).value || '';
+        if (n.trim() || f.trim()) r.push('- ' + (n.trim() || 'Model') + '：' + (f.trim() || '（待补充）'));
+      });
+      return r;
+    }
+
+    // ================================================================
+    // 获取选中值
+    // ================================================================
+    function val(id) { return (document.getElementById(id) || {}).value || ''; }
+
+    function getChips(groupId) {
+      return Array.from(document.querySelectorAll('#' + groupId + ' .chip.on')).map(c => c.textContent.trim());
+    }
+
+    function getChipText(groupId) {
+      return getChips(groupId).join(' + ') || '（未选择）';
+    }
+
+    // ================================================================
+    // 生成提示词
+    // ================================================================
+    function generate() {
+      // 必填校验 — 项目基本信息
+      const required = [
+        { id: 'pName', label: '项目名称' },
+        { id: 'pType', label: '项目类型' },
+        { id: 'pDesc', label: '一句话描述' },
+        { id: 'pFeatures', label: '核心功能' },
+      ];
+      for (const field of required) {
+        const el = document.getElementById(field.id);
+        if (!el || !el.value.trim()) {
+          el?.focus();
+          el?.classList.add('ring-1', 'ring-red-400/50');
+          setTimeout(() => el?.classList.remove('ring-1', 'ring-red-400/50'), 2000);
+          showToast('请填写「' + field.label + '」');
+          return;
+        }
+      }
+
+      const name = val('pName');
+      const type = val('pType');
+      const desc = val('pDesc');
+      const features = val('pFeatures');
+      const extra = val('pExtra');
+      const models = getModels();
+
+      const fe = getChipText('cFe');
+      const css = getChipText('cCss');
+      const be = getChipText('cBe');
+      const db = getChipText('cDb') + (getChips('cOrm').length > 0 ? ' + ' + getChipText('cOrm') : '');
+      const auth = getChipText('cAuth');
+      const deploy = getChipText('cDeploy');
+
+      const extras = getChips('cExtra');
+      const scope = getChips('cScope');
+
+      // 处理功能列表
+      const featureList = features
+        .split(/[，,]/)
+        .map(f => f.trim())
+        .filter(f => f.length > 0)
+        .filter((v, i, a) => a.indexOf(v) === i)
+        .map(f => '- ' + f)
+        .join('\n');
+
+      // 生成文件清单（动态编号）
+      const files = [];
+      let fileIdx = 0;
+      if (scope.includes('Schema 文件')) files.push(++fileIdx + '. prisma/schema.prisma（含关系、索引、枚举）');
+      if (scope.includes('数据库客户端')) files.push(++fileIdx + '. lib/db.ts（Prisma Client 单例）');
+      if (scope.includes('CRUD API')) files.push(++fileIdx + '. 核心 API（每个实体：GET 列表+分页、GET 单条、POST、PATCH、DELETE）');
+      if (scope.includes('类型定义')) files.push(++fileIdx + '. types/index.ts（基于 Prisma 的业务类型）');
+      if (scope.includes('.env.example')) files.push(++fileIdx + '. .env.example（含注释说明）');
+      if (scope.includes('.gitignore')) files.push(++fileIdx + '. .gitignore（Node 项目标准规则）');
+      if (scope.includes('README.md')) files.push(++fileIdx + '. README.md（项目简介、技术栈、启动步骤、目录结构）');
+      if (scope.includes('前端页面')) files.push(++fileIdx + '. 核心页面与组件');
+      if (scope.includes('认证集成')) files.push(++fileIdx + '. 认证配置 + middleware.ts');
+      if (scope.includes('Swagger / OpenAPI')) files.push(++fileIdx + '. Swagger / OpenAPI 文档配置');
+
+      // 不需要生成
+      const notNeed = ['测试文件', 'CI/CD 配置'];
+      if (!scope.includes('前端页面')) notNeed.unshift('前端页面（先打通后端）');
+      if (!scope.includes('认证集成')) notNeed.unshift('认证集成（后续迭代）');
+
+      const hasModels = models.length > 0;
+
+      const extraText = extras.length > 0
+        ? '\n## 第三方集成\n' + extras.map(e => '- ' + e).join('\n')
+        : '';
+
+      const noteText = extra
+        ? '\n## 额外要求\n' + extra
+        : '';
+
+      const out = '# 项目初始化：' + name + '\n' +
+        '\n' +
+        '## 项目信息\n' +
+        '- 类型：' + type + '\n' +
+        '- 定位：' + desc + '\n' +
+        '\n' +
+        '## 技术栈（严格按此生成，不替换）\n' +
+        '- 前端：' + fe + '（App Router）+ ' + css + '\n' +
+        '- 后端：' + be + '\n' +
+        '- 数据库：' + db + '\n' +
+        '- 认证：' + auth + '\n' +
+        '- 部署：' + deploy + '\n' +
+        '- HTTP 请求：Axios\n' +
+        '\n' +
+        '## 核心功能\n' +
+        featureList + '\n' +
+        '\n' +
+        (hasModels ? '## 数据模型\n' + models.join('\n') + '\n' +
+        '\n' +
+        '每个模型要求：id 用 cuid、含 createdAt/updatedAt、状态字段用 enum、加常用查询索引、明确外键的 onDelete 行为。\n' : '') +
+        extraText +
+        '\n' +
+        '## 需要生成的文件\n' +
+        files.join('\n') + '\n' +
+        '\n' +
+        '## 不需要生成\n' +
+        notNeed.map(n => '- ' + n).join('\n') +
+        noteText + '\n' +
+        '\n' +
+        '## 代码规范\n' +
+        '- TypeScript 严格模式，禁止 any\n' +
+        '- API 统一返回格式：{ data, error }\n' +
+        '- 数据库操作包裹 try/catch，异常返回 HTTP 500\n' +
+        '- 关键逻辑加中文注释\n' +
+        '\n' +
+        '## 输出要求\n' +
+        '1. 按文件逐个输出，每段前标注完整文件路径\n' +
+        '2. 全部完成后给出本地启动步骤（install → .env → migrate → dev）\n' +
+        '3. 启动后说明如何验证项目正常运行（如访问 http://localhost:3000 确认页面加载、调用测试 API 确认接口可用）\n' +
+        '4. 最后列出 3 个后续可迭代的功能方向';
+
+      document.getElementById('outputBox').innerText = out;
+      document.getElementById('outputWrap').style.display = 'block';
+      document.getElementById('outputWrap').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      document.getElementById('wordCount').textContent = '· ' + out.length + ' 字';
+
+      // 重置 DeepSeek 验证状态
+      document.getElementById('dsResult').classList.add('hidden');
+      document.getElementById('dsFeedback').classList.add('hidden');
+      document.getElementById('dsLoading').classList.add('hidden');
+      document.getElementById('dsOptimizeLoading').classList.add('hidden');
+    }
+
+    // ================================================================
+    // DeepSeek 验证
+    // ================================================================
+    const DS_API_URL = 'https://api.deepseek.com/v1/chat/completions';
+    const DS_MODEL = 'deepseek-chat';
+    const DS_KEY_STORAGE = 'vibe-prompt-ds-key';
+
+    function toggleDsSettings() {
+      const el = document.getElementById('dsSettings');
+      el.style.display = el.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function toggleDsKey() {
+      const inp = document.getElementById('dsApiKey');
+      inp.type = inp.type === 'password' ? 'text' : 'password';
+    }
+
+    // 从 localStorage 恢复 API Key
+    try { const k = localStorage.getItem(DS_KEY_STORAGE); if (k) document.getElementById('dsApiKey').value = k; } catch(e) {}
+
+    async function validatePrompt() {
+      const promptText = document.getElementById('outputBox').innerText;
+      if (!promptText) { showToast('请先生成提示词'); return; }
+
+      const apiKey = document.getElementById('dsApiKey').value.trim();
+      if (!apiKey) {
+        showToast('请先填写 DeepSeek API Key');
+        toggleDsSettings();
+        return;
+      }
+
+      // 保存 API Key
+      try { localStorage.setItem(DS_KEY_STORAGE, apiKey); } catch(e) {}
+
+      const systemPrompt = document.getElementById('dsSystemPrompt').value.trim() ||
+        '你是一个资深的 AI 提示词审核专家。请检查以下提示词，指出逻辑问题、不严谨之处、模糊描述和优化建议。用中文回复，按类别分条列出。';
+
+      // UI 状态
+      document.getElementById('dsLoading').classList.remove('hidden');
+      document.getElementById('dsResult').classList.add('hidden');
+      document.getElementById('dsValidateBtn').disabled = true;
+
+      try {
+        const res = await fetch(DS_API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+          body: JSON.stringify({
+            model: DS_MODEL,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: '请审核以下 AI 编程提示词：\n\n' + promptText }
+            ],
+            temperature: 0.3,
+            max_tokens: 2048
+          })
+        });
+
+        if (!res.ok) {
+          let msg = '请求失败 (' + res.status + ')';
+          try { const d = await res.json(); msg = d.error?.message || msg; } catch(e) {}
+          throw new Error(msg);
+        }
+
+        const data = await res.json();
+        const reply = data.choices?.[0]?.message?.content || '（DeepSeek 未返回有效内容）';
+
+        document.getElementById('dsResult').innerHTML = '<div class="ds-result-box">' + reply.replace(/\n/g, '<br>') + '</div>';
+        document.getElementById('dsResult').classList.remove('hidden');
+
+        // 显示反馈区
+        document.getElementById('dsFeedback').classList.remove('hidden');
+        document.getElementById('dsUserFeedback').value = '';
+      } catch (err) {
+        document.getElementById('dsResult').innerHTML =
+          '<div class="ds-result-box" style="color:rgba(255,150,150,0.85)">验证失败：' + err.message + '</div>';
+        document.getElementById('dsResult').classList.remove('hidden');
+      } finally {
+        document.getElementById('dsLoading').classList.add('hidden');
+        document.getElementById('dsValidateBtn').disabled = false;
+      }
+    }
+
+    // ================================================================
+    // DeepSeek 优化生成
+    // ================================================================
+    async function regenerateOptimized() {
+      const originalPrompt = document.getElementById('outputBox').innerText;
+      if (!originalPrompt) { showToast('没有可优化的提示词'); return; }
+
+      const apiKey = document.getElementById('dsApiKey').value.trim();
+      if (!apiKey) { showToast('请先填写 DeepSeek API Key'); return; }
+
+      const userFeedback = document.getElementById('dsUserFeedback').value.trim() || '同意优化建议，请生成优化后的提示词';
+
+      const systemPrompt =
+        '你是一个 AI 提示词优化专家。用户通过表单生成了一个 AI 编程提示词，DeepSeek 的审核给出了优化建议，用户也确认或补充了意见。' +
+        '请根据「原始提示词」和「用户反馈」，输出一份优化后的完整提示词。\n\n' +
+        '规则：\n' +
+        '1. 直接输出优化后的提示词内容，不要附加任何说明、解释、开头语或结尾语\n' +
+        '2. 保持 Markdown 格式，与原提示词结构一致\n' +
+        '3. 逐条落实用户反馈中的每项要求\n' +
+        '4. 如果用户没有具体修改要求，则按照 DeepSeek 之前的审核建议进行优化';
+
+      document.getElementById('dsOptimizeLoading').classList.remove('hidden');
+      document.getElementById('dsOptimizeBtn').disabled = true;
+
+      try {
+        const res = await fetch(DS_API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+          body: JSON.stringify({
+            model: DS_MODEL,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: '原始提示词：\n\n' + originalPrompt + '\n\n用户反馈/确认：\n' + userFeedback }
+            ],
+            temperature: 0.3,
+            max_tokens: 4096
+          })
+        });
+
+        if (!res.ok) {
+          let msg = '请求失败 (' + res.status + ')';
+          try { const d = await res.json(); msg = d.error?.message || msg; } catch(e) {}
+          throw new Error(msg);
+        }
+
+        const data = await res.json();
+        const optimized = data.choices?.[0]?.message?.content || '';
+
+        if (optimized) {
+          document.getElementById('outputBox').innerText = optimized;
+          document.getElementById('wordCount').textContent = '· ' + optimized.length + ' 字';
+          showToast('提示词已优化更新 ✅');
+        } else {
+          throw new Error('DeepSeek 未返回优化结果');
+        }
+      } catch (err) {
+        showToast('优化失败：' + err.message);
+      } finally {
+        document.getElementById('dsOptimizeLoading').classList.add('hidden');
+        document.getElementById('dsOptimizeBtn').disabled = false;
+      }
+    }
+
+    // ================================================================
+    // 复制 & 发送
+    // ================================================================
+    function copyPrompt() {
+      const text = document.getElementById('outputBox').innerText;
+      if (!text) return;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+          showToast('已成功复制提示词~');
+        });
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = text; document.body.appendChild(textarea);
+        textarea.select(); document.execCommand('copy'); document.body.removeChild(textarea);
+        showToast('已成功复制提示词~');
+      }
+    }
+
+    function sendPrompt() {
+      const text = document.getElementById('outputBox').innerText;
+      if (!text) return;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+          showToast('提示词已复制，去 Claude 粘贴即可 🚀');
+        });
+      } else {
+        showToast('请手动复制提示词，然后发给 Claude');
+      }
+    }
+
+    // ================================================================
+    // Toast 提示
+    // ================================================================
+    let toastTimer = 0;
+
+    function showToast(msg) {
+      let toast = document.getElementById('toast');
+      if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'toast';
+        toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:9999;background:rgba(127,119,221,0.2);backdrop-filter:blur(16px);border:0.5px solid rgba(127,119,221,0.3);border-radius:14px;padding:12px 20px;font-size:14px;color:rgba(255,255,255,0.85);box-shadow:0 12px 40px rgba(0,0,0,0.4);transition:opacity 0.3s,transform 0.3s;opacity:0;transform:translateX(-50%) translateY(10px)';
+        document.body.appendChild(toast);
+      }
+      toast.textContent = msg;
+      toast.style.opacity = '1';
+      toast.style.transform = 'translateX(-50%) translateY(0)';
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(-50%) translateY(10px)';
+      }, 2500);
+    }
+
+    /* ---- 自动替换静态图标为内联 SVG ---- */
+    (function() {
+      var map = { sparkles:'sparkles', wand:'wand', scale:'scale', components:'components', 'info-circle':'info', 'stack-2':'stack', database:'database', puzzle:'puzzle', 'file-text':'file', code:'code', copy:'copy', 'brand-claude':'claude', 'arrow-right':'arrow-right', check:'check', plus:'plus', x:'x', bulb:'bulb', 'arrow-left':'arrow-left', deepseek:'deepseek', brain:'brain', settings:'settings', eye:'eye' };
+      document.querySelectorAll('[class*="ti-"]').forEach(function(el) {
+        if (el.tagName !== 'I') return;
+        for (var name in map) {
+          if (el.classList.contains('ti-' + name)) {
+            var size = parseInt(el.style.fontSize) || 20;
+            var cls = '';
+            el.classList.forEach(function(c) { if (c.indexOf('text-') === 0) cls = c; });
+            el.outerHTML = icon(map[name], cls, size);
+            break;
+          }
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
