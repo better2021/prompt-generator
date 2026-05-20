@@ -148,6 +148,11 @@
       border-color: rgba(127, 119, 221, 0.5);
       color: #c8c3ff;
     }
+    .chip.incompatible {
+      opacity: 0.2;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
 
     /* ---- Tabs ---- */
     .tab {
@@ -437,6 +442,7 @@
                 <span class="chip" data-group="orm">SQLAlchemy</span>
                 <span class="chip" data-group="orm">Django ORM</span>
                 <span class="chip" data-group="orm">GORM</span>
+                <span class="chip" data-group="orm">MyBatis-Plus</span>
                 <span class="chip" data-group="orm">不需要</span>
               </div>
             </div>
@@ -476,6 +482,19 @@
           </button>
         </div>
 
+        <!-- 前端页面映射（可选） -->
+        <div class="mb-2 flex items-center gap-2">
+          <i class="ti ti-file-text text-violet" style="font-size:16px"></i>
+          <span class="text-[11px] font-medium uppercase tracking-[0.06em] text-white/40">前端页面映射（可选）</span>
+        </div>
+        <div class="glass-card-inner mb-6 rounded-2xl p-4 sm:p-5">
+          <label class="mb-2 block text-[13px] text-white/50">从数据模型同步后勾选需要生成的页面（不填则 AI 自动判断页面结构）</label>
+          <div id="pageMapContainer" class="min-h-[40px]">
+            <div class="text-[13px] text-white/30 py-2">点击下方按钮从数据模型同步实体</div>
+          </div>
+          <button onclick="syncPageMap()" class="mt-2 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-[12px] text-white/40 transition hover:bg-white/10 hover:text-white/60">从数据模型同步</button>
+        </div>
+
         <!-- 额外需求 -->
         <div class="mb-2 flex items-center gap-2">
           <i class="ti ti-puzzle text-violet" style="font-size:16px"></i>
@@ -484,6 +503,7 @@
         <div class="glass-card-inner mb-6 rounded-2xl p-4 sm:p-5">
           <label class="mb-1.5 block text-[13px] text-white/50">第三方集成</label>
           <div class="chip-row mb-3 flex flex-wrap gap-1.5" id="cExtra">
+            <span class="chip on" data-group="extra">Axios</span>
             <span class="chip" data-group="extra">Stripe 支付</span>
             <span class="chip" data-group="extra">文件上传</span>
             <span class="chip" data-group="extra">邮件发送</span>
@@ -491,7 +511,7 @@
             <span class="chip" data-group="extra">实时推送</span>
             <span class="chip" data-group="extra">多角色权限</span>
             <span class="chip" data-group="extra">多语言</span>
-            <span class="chip" data-group="extra">数据导出</span>
+            <span class="chip" data-group="extra">数据导出Excel表</span>
           </div>
           <div>
             <label class="mb-1.5 block text-[13px] text-white/50">其他补充</label>
@@ -506,16 +526,17 @@
         </div>
         <div class="glass-card-inner mb-6 rounded-2xl p-4 sm:p-5">
           <div class="chip-row flex flex-wrap gap-1.5" id="cScope">
-            <span class="chip on" data-group="scope">Schema 文件</span>
+             <span class="chip on" data-group="scope">类型定义</span>
+            <span class="chip on" data-group="scope">数据模型</span>
             <span class="chip on" data-group="scope">数据库客户端</span>
             <span class="chip on" data-group="scope">CRUD API</span>
-            <span class="chip on" data-group="scope">类型定义</span>
             <span class="chip on" data-group="scope">.env.example</span>
             <span class="chip on" data-group="scope">.gitignore</span>
             <span class="chip on" data-group="scope">README.md</span>
             <span class="chip on" data-group="scope">前端页面</span>
             <span class="chip" data-group="scope">认证集成</span>
             <span class="chip" data-group="scope">Swagger / OpenAPI</span>
+            <span class="chip" data-group="scope">种子数据</span>
           </div>
         </div>
 
@@ -908,8 +929,125 @@
         } else {
           this.classList.toggle('on');
         }
+        updateChipCompatibility();
       });
     });
+
+    // ---- 技术栈联动校验
+    const FE_CSS_MAP = {
+      'Next.js 14': ['Tailwind CSS', 'shadcn/ui', 'Ant Design', 'Ant Design Mobile'],
+      'React + Vite': ['Tailwind CSS', 'shadcn/ui', 'Ant Design', 'Ant Design Mobile'],
+      'Remix': ['Tailwind CSS', 'shadcn/ui', 'Ant Design', 'Ant Design Mobile'],
+      'Nuxt 3': ['Tailwind CSS', 'Element Plus', 'Naive UI', 'Vant（移动端）', 'NutUI（移动端）'],
+      'Vue 3 + Vite': ['Tailwind CSS', 'Element Plus', 'Naive UI', 'Vant（移动端）', 'NutUI（移动端）'],
+      'SvelteKit': ['Tailwind CSS'],
+      '纯 HTML': ['Tailwind CSS'],
+    };
+    const DB_ORM_MAP = {
+      'MySQL': ['Prisma', 'Drizzle', 'SQLAlchemy', 'Django ORM', 'GORM', 'MyBatis-Plus', '不需要'],
+      'PostgreSQL': ['Prisma', 'Drizzle', 'SQLAlchemy', 'Django ORM', 'GORM', 'MyBatis-Plus', '不需要'],
+      'SQLite': ['Prisma', 'Drizzle', 'SQLAlchemy', 'Django ORM', 'GORM', 'MyBatis-Plus', '不需要'],
+      'MongoDB': ['Prisma', '不需要'],
+      '暂不需要': ['不需要'],
+    };
+    const BE_ORM_MAP = {
+      'Next.js API Routes': ['Prisma', 'Drizzle', '不需要'],
+      'Python + FastAPI': ['SQLAlchemy', 'Django ORM', '不需要'],
+      'Go + Gin': ['GORM', '不需要'],
+      'Go + Echo': ['GORM', '不需要'],
+      'Java + Spring Boot': ['MyBatis-Plus', '不需要'],
+      'Node + Hono': ['Prisma', 'Drizzle', '不需要'],
+      'Node + Fastify': ['Prisma', 'Drizzle', '不需要'],
+      'Rust + Axum': ['不需要'],
+      '暂不需要': ['不需要'],
+    };
+
+    function updateChipCompatibility() {
+      var fe = document.querySelector('#cFe .chip.on');
+      if (fe) {
+        var cssList = FE_CSS_MAP[fe.textContent.trim()] || [];
+        document.querySelectorAll('#cCss .chip').forEach(function(c) {
+          c.classList.toggle('incompatible', cssList.indexOf(c.textContent.trim()) === -1);
+        });
+        var cur = document.querySelector('#cCss .chip.on');
+        if (cur && cssList.indexOf(cur.textContent.trim()) === -1) {
+          cur.classList.remove('on');
+          var fb = document.querySelector('#cCss .chip:not(.incompatible)');
+          if (fb) fb.classList.add('on');
+        }
+      }
+      // 计算兼容的 ORM：后端和数据库的交集
+      var be = document.querySelector('#cBe .chip.on');
+      var db = document.querySelector('#cDb .chip.on');
+      var compatibleOrms = null;
+      if (be) {
+        var beList = BE_ORM_MAP[be.textContent.trim()];
+        if (beList) compatibleOrms = beList.slice();
+      }
+      if (db) {
+        var dbList = DB_ORM_MAP[db.textContent.trim()];
+        if (dbList) {
+          compatibleOrms = compatibleOrms === null ? dbList.slice() : compatibleOrms.filter(function(o) { return dbList.indexOf(o) !== -1; });
+        }
+      }
+      if (compatibleOrms !== null) {
+        document.querySelectorAll('#cOrm .chip').forEach(function(c) {
+          c.classList.toggle('incompatible', compatibleOrms.indexOf(c.textContent.trim()) === -1);
+        });
+        var cur = document.querySelector('#cOrm .chip.on');
+        if (cur && compatibleOrms.indexOf(cur.textContent.trim()) === -1) {
+          cur.classList.remove('on');
+          var fb = document.querySelector('#cOrm .chip:not(.incompatible)');
+          if (fb) fb.classList.add('on');
+        }
+      }
+    }
+
+    // ---- 前端页面映射
+    function syncPageMap() {
+      var container = document.getElementById('pageMapContainer');
+      var names = [];
+      document.querySelectorAll('.model-row').forEach(function(row) {
+        var idx = row.id.replace('mr', '');
+        var n = (document.getElementById('mn' + idx) || {}).value || '';
+        if (n.trim()) names.push(n.trim());
+      });
+      if (names.length === 0) {
+        container.innerHTML = '<div class="text-[13px] text-white/30 py-2">数据模型中暂无实体，请先添加实体</div>';
+        return;
+      }
+      var prev = {};
+      container.querySelectorAll('input[type="checkbox"]').forEach(function(cb) {
+        prev[cb.dataset.entity + ':' + cb.dataset.page] = cb.checked;
+      });
+      var html = '';
+      for (var i = 0; i < names.length; i++) {
+        var en = names[i];
+        html += '<div class="flex items-center gap-3 py-2 border-b border-white/5 last:border-0">' +
+          '<span class="w-20 shrink-0 text-sm font-medium text-white/70">' + en + '</span>' +
+          '<label class="flex cursor-pointer items-center gap-1.5 text-[13px] text-white/50"><input type="checkbox" class="accent-violet" data-entity="' + en + '" data-page="list" ' + (prev[en + ':list'] ? 'checked' : '') + '> 列表页</label>' +
+          '<label class="flex cursor-pointer items-center gap-1.5 text-[13px] text-white/50"><input type="checkbox" class="accent-violet" data-entity="' + en + '" data-page="detail" ' + (prev[en + ':detail'] ? 'checked' : '') + '> 详情页</label>' +
+          '<label class="flex cursor-pointer items-center gap-1.5 text-[13px] text-white/50"><input type="checkbox" class="accent-violet" data-entity="' + en + '" data-page="form" ' + (prev[en + ':form'] ? 'checked' : '') + '> 新建/编辑</label>' +
+          '</div>';
+      }
+      container.innerHTML = html;
+    }
+    function getPageMap() {
+      var pages = [], groups = {};
+      document.querySelectorAll('#pageMapContainer input[type="checkbox"]:checked').forEach(function(cb) {
+        var en = cb.dataset.entity, pt = cb.dataset.page;
+        if (!groups[en]) groups[en] = {};
+        groups[en][pt] = true;
+      });
+      for (var en in groups) {
+        if (!groups.hasOwnProperty(en)) continue;
+        var t = groups[en], base = '/' + en.toLowerCase() + 's';
+        if (t.list) pages.push(base + ' — ' + en + '列表页');
+        if (t.detail) pages.push(base + '/[id] — ' + en + '详情页');
+        if (t.form) { pages.push(base + '/new — 新建' + en); pages.push(base + '/[id]/edit — 编辑' + en); }
+      }
+      return pages;
+    }
 
     // ================================================================
     // 数据模型行
@@ -926,11 +1064,14 @@
         '<input type="text" class="glass-input flex-1 rounded-lg px-2.5 py-1.5 text-sm" placeholder="字段：id, title, userId(FK→User), status(enum), createdAt" id="mf' + i + '" value="' + (fields || '') + '" />' +
         '<button class="del-btn" onclick="document.getElementById(\'mr' + i + '\').remove()" aria-label="删除">' + icon('x', '', 16) + '</button>';
       document.getElementById('modelList').appendChild(div);
+      syncPageMap();
     }
 
     // 初始行
     addModel('User', 'id, email, name, createdAt, updatedAt');
     addModel('', '');
+    // 初始化前端页面映射
+    syncPageMap();
 
     function getModels() {
       const r = [];
@@ -994,6 +1135,11 @@
 
       const extras = getChips('cExtra');
       const scope = getChips('cScope');
+      const pageMap = getPageMap();
+      const hasPageMap = pageMap.length > 0;
+      const seedData = scope.includes('种子数据');
+      const pagesRouteText = (scope.includes('前端页面') && hasPageMap) ? '\n## 前端页面\n' + pageMap.map(function(p) { return '- ' + p; }).join('\n') + '\n' : '';
+      const seedDataText = seedData ? '\n## 种子数据（初始化）\n- 为每个实体生成 5~10 条符合业务逻辑的示范数据\n- 外键关联正确，状态分布合理，数据有真实感\n- 生成对应的 seed 文件（如 prisma/seed.ts）和 seed 脚本配置\n' : '';
 
       // 处理功能列表
       const featureList = features
@@ -1007,16 +1153,35 @@
       // 生成文件清单（动态编号）
       const files = [];
       let fileIdx = 0;
-      if (scope.includes('Schema 文件')) files.push(++fileIdx + '. prisma/schema.prisma（含关系、索引、枚举）');
-      if (scope.includes('数据库客户端')) files.push(++fileIdx + '. lib/db.ts（Prisma Client 单例）');
+      if (scope.includes('数据模型')) {
+        var _ormChips = getChips('cOrm');
+        var _ormName = _ormChips.length > 0 ? _ormChips[0] : '';
+        var _schemaPaths = {'Prisma':'prisma/schema.prisma','Drizzle':'db/schema.ts','SQLAlchemy':'app/models/','Django ORM':'app/models.py','GORM':'models/','MyBatis-Plus':'src/main/java/com/example/entity/'};
+        var _schemaDescs = {'Prisma':'含关系、索引、枚举','Drizzle':'Drizzle 表定义','SQLAlchemy':'SQLAlchemy 模型','Django ORM':'Django 模型','GORM':'GORM 模型结构体','MyBatis-Plus':'实体类与表映射'};
+        files.push(++fileIdx + '. ' + (_schemaPaths[_ormName] || 'schema/') + '（' + (_schemaDescs[_ormName] || '数据模型定义') + '）');
+      }
+      if (scope.includes('数据库客户端') && be !== '暂不需要') {
+        var _dbPaths = {'Go + Gin':'models/db.go','Go + Echo':'models/db.go','Python + FastAPI':'app/database.py','Java + Spring Boot':'src/main/resources/application.yml','Rust + Axum':'src/db.rs','Node + Hono':'lib/db.ts','Node + Fastify':'lib/db.ts','Next.js API Routes':'lib/db.ts'};
+        var _ormDescs = {'Prisma':'Prisma Client 单例','Drizzle':'Drizzle Client 配置','SQLAlchemy':'数据库引擎与会话配置','GORM':'GORM 连接初始化','MyBatis-Plus':'MyBatis-Plus 配置','Django ORM':'数据源配置'};
+        var _orm = getChips('cOrm');
+        files.push(++fileIdx + '. ' + (_dbPaths[be] || 'lib/db.ts') + '（' + (_ormDescs[_orm[0]] || '数据库客户端配置') + '）');
+      }
       if (scope.includes('CRUD API')) files.push(++fileIdx + '. 核心 API（每个实体：GET 列表+分页、GET 单条、POST、PATCH、DELETE）');
-      if (scope.includes('类型定义')) files.push(++fileIdx + '. types/index.ts（基于 Prisma 的业务类型）');
+      if (scope.includes('类型定义') && be !== '暂不需要') {
+        var _typePaths = {'Go + Gin':'models/types.go','Go + Echo':'models/types.go','Python + FastAPI':'app/schemas.py','Java + Spring Boot':'src/main/java/com/example/model/','Rust + Axum':'src/types.rs'};
+        var _typeDescs = {'Go + Gin':'数据模型与请求响应结构体','Go + Echo':'数据模型与请求响应结构体','Python + FastAPI':'Pydantic 数据模型','Java + Spring Boot':'Java 实体类','Rust + Axum':'Rust 类型定义'};
+        files.push(++fileIdx + '. ' + (_typePaths[be] || 'types/index.ts') + '（' + (_typeDescs[be] || '业务类型定义') + '）');
+      }
       if (scope.includes('.env.example')) files.push(++fileIdx + '. .env.example（含注释说明）');
       if (scope.includes('.gitignore')) files.push(++fileIdx + '. .gitignore（Node 项目标准规则）');
       if (scope.includes('README.md')) files.push(++fileIdx + '. README.md（项目简介、技术栈、启动步骤、目录结构）');
-      if (scope.includes('前端页面')) files.push(++fileIdx + '. 核心页面与组件');
-      if (scope.includes('认证集成')) files.push(++fileIdx + '. 认证配置 + middleware.ts');
+      if (scope.includes('前端页面')) files.push(++fileIdx + (hasPageMap ? '. 前端页面（列表/详情/表单页，见路由清单）' : '. 核心页面与组件'));
+      if (scope.includes('认证集成') && be !== '暂不需要') {
+        var _authPaths = {'Go + Gin':'middleware/auth.go','Go + Echo':'middleware/auth.go','Python + FastAPI':'app/auth.py','Java + Spring Boot':'config/SecurityConfig.java','Rust + Axum':'src/auth.rs','Node + Hono':'src/middleware/auth.ts','Node + Fastify':'src/middleware/auth.ts','Next.js API Routes':'认证配置 + middleware.ts'};
+        files.push(++fileIdx + '. ' + (_authPaths[be] || 'auth/') + '（认证集成配置）');
+      }
       if (scope.includes('Swagger / OpenAPI')) files.push(++fileIdx + '. Swagger / OpenAPI 文档配置');
+      if (seedData) files.push(++fileIdx + '. 种子数据脚本（含初始示范数据）');
 
       // 不需要生成
       const notNeed = ['测试文件', 'CI/CD 配置'];
@@ -1040,12 +1205,11 @@
         '- 定位：' + desc + '\n' +
         '\n' +
         '## 技术栈（严格按此生成，不替换）\n' +
-        '- 前端：' + fe + '（App Router）+ ' + css + '\n' +
+        '- 前端：' + fe + ' + ' + css + '\n' +
         '- 后端：' + be + '\n' +
         '- 数据库：' + db + '\n' +
         '- 认证：' + auth + '\n' +
         '- 部署：' + deploy + '\n' +
-        '- HTTP 请求：Axios\n' +
         '\n' +
         '## 核心功能\n' +
         featureList + '\n' +
@@ -1063,7 +1227,7 @@
         noteText + '\n' +
         '\n' +
         '## 代码规范\n' +
-        '- TypeScript 严格模式，禁止 any\n' +
+        '- 前端TypeScript 严格模式，禁止 any\n' +
         '- API 统一返回格式：{ data, error }\n' +
         '- 数据库操作包裹 try/catch，异常返回 HTTP 500\n' +
         '- 关键逻辑加中文注释\n' +
@@ -1296,6 +1460,9 @@
         toast.style.transform = 'translateX(-50%) translateY(10px)';
       }, 2500);
     }
+
+    // 初始化技术栈联动
+    updateChipCompatibility();
 
     /* ---- 自动替换静态图标为内联 SVG ---- */
     (function() {
