@@ -538,6 +538,9 @@
               <button onclick="copyPrompt()" class="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-[12px] text-white/50 transition hover:bg-white/10 hover:text-white/70">
                 <i class="ti ti-copy mr-1 align-middle" style="font-size:14px"></i>复制
               </button>
+              <button onclick="downloadMd()" class="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-[12px] text-white/50 transition hover:bg-white/10 hover:text-white/70">
+                <i class="ti ti-file mr-1 align-middle" style="font-size:14px"></i>下载 MD
+              </button>
               <button onclick="sendPrompt()" class="rounded-xl bg-violet/70 px-3 py-1.5 text-[12px] text-white transition hover:bg-violet-hover">
                 <i class="ti ti-brand-claude mr-1 align-middle" style="font-size:14px"></i>发给 Claude
               </button>
@@ -1244,6 +1247,19 @@
         textarea.select(); document.execCommand('copy'); document.body.removeChild(textarea);
         showToast('已成功复制提示词~');
       }
+    }
+
+    function downloadMd() {
+      const text = document.getElementById('outputBox').innerText;
+      if (!text) { showToast('没有可下载的内容'); return; }
+      const name = (document.getElementById('pName').value || 'prompt').trim();
+      const blob = new Blob([text], { type: 'text/markdown;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = name + '.md';
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a); URL.revokeObjectURL(url);
+      showToast('MD 文件已下载 ✅');
     }
 
     function sendPrompt() {
